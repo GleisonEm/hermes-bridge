@@ -4,7 +4,7 @@
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 [![Hermes Compatible](https://img.shields.io/badge/Hermes-Agent-purple.svg)](https://github.com/NousResearch/hermes-agent)
 
-Conecte qualquer agente de código (**Anthropic Claude Code**, **OpenAI Codex**, **Google Antigravity**, **Cursor**, **Zed**) ao **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** como um **Superbrain** compartilhado de memórias duráveis, catálogo de skills e histórico de sessões.
+Conecte qualquer agente de código (**Anthropic Claude Code**, **OpenAI Codex**, **Google Antigravity**, **Cursor**, **Zed**, **Windsurf**) ao **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** como um **Superbrain** compartilhado de memórias duráveis, catálogo de skills e histórico de sessões.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -34,8 +34,8 @@ Conecte qualquer agente de código (**Anthropic Claude Code**, **OpenAI Codex**,
 
 ## 📋 Pré-requisitos
 
-1. **Hermes Agent instalado**: Você só precisa ter a instalação padrão do Hermes no seu computador (`~/.hermes` com `state.db`).
-2. **Python 3.10+**: O ambiente virtual que já vem no Hermes (`~/.hermes/hermes-agent/venv/bin/python`) possui Python 3.11+ e é o interpretador recomendado.
+1. **Hermes Agent instalado**: Ter a instalação padrão do Hermes no seu computador (`~/.hermes` com `state.db`).
+2. **Python 3.10+**: O ambiente virtual que já vem no Hermes (`~/.hermes/hermes-agent/venv/bin/python`) possui Python 3.11+ e é o interpretador recomendado para rodar o MCP.
 
 ---
 
@@ -52,23 +52,26 @@ cd ~/dev/hermes-bridge
 O instalador vai:
 - Validar a conexão com o seu banco do Hermes.
 - Instalar a CLI `hermes-superbrain` no seu PATH (`~/.local/bin/`).
-- Se detectar o Claude Code instalado, perguntará se deseja adicioná-lo automaticamente via CLI.
+- Instalar automaticamente a **Skill** em todos os harnesses detectados no seu sistema (`~/.claude/skills/`, `~/.codex/skills/`, `~/.gemini/...`).
+- Registrar o MCP no Claude Code (se detectado).
 - Gerar os blocos de configuração prontos com os **caminhos absolutos exatos** da sua máquina.
 
 ---
 
-## 🔧 Configuração Manual por Agente
+## 🔧 Configuração Completa por Harness (MCP + Skill + Regras)
 
-Caso prefira configurar manualmente no seu editor ou agente favorito, use os blocos abaixo:
+Abaixo está o guia detalhado de como plugar o **MCP**, instalar a **Skill** e configurar as **Regras** em cada agente:
 
-### 1. Anthropic Claude Code
+---
 
-Você pode adicionar em um único comando no terminal:
+### 🟣 1. Anthropic Claude Code
+
+#### A. Registrar o Servidor MCP
+Execute o comando CLI:
 ```bash
 claude mcp add hermes-bridge -- ~/.hermes/hermes-agent/venv/bin/python /Users/<SEU_USUARIO>/dev/hermes-bridge/hermes_bridge_mcp.py
 ```
-
-Ou editando diretamente o seu arquivo de configuração global (`~/.claude.json` ou `~/.claude/settings.json`):
+*(Ou edite `~/.claude.json` ou `~/.claude/settings.json`):*
 ```json
 {
   "mcpServers": {
@@ -83,11 +86,34 @@ Ou editando diretamente o seu arquivo de configuração global (`~/.claude.json`
 }
 ```
 
+#### B. Onde colocar a Skill
+- **Global** (vale para todos os projetos):
+  ```bash
+  mkdir -p ~/.claude/skills/hermes-superbrain
+  cp skills/hermes-superbrain/SKILL.md ~/.claude/skills/hermes-superbrain/SKILL.md
+  ```
+- **No Projeto**:
+  ```bash
+  mkdir -p .claude/skills/hermes-superbrain
+  cp skills/hermes-superbrain/SKILL.md .claude/skills/hermes-superbrain/SKILL.md
+  ```
+
+#### C. Regra no `CLAUDE.md`
+No arquivo `CLAUDE.md` na raiz do seu projeto:
+```markdown
+## Hermes Superbrain Integration
+- Considere o Hermes como fonte primária de inteligência (Superbrain) deste ambiente.
+- Utilize o MCP `hermes-bridge` (via skill `hermes-superbrain`) para consultar memórias e sessões passadas antes de planejar ou codificar.
+- Quando aprender regras duráveis do projeto, grave na memória via `memory_record`.
+- Sempre que concluir um marco relevante, sincronize a sessão via `session_sync`.
+```
+
 ---
 
-### 2. OpenAI Codex
+### 🟢 2. OpenAI Codex
 
-No seu arquivo `~/.codex/config.toml`:
+#### A. Registrar o Servidor MCP
+No arquivo `~/.codex/config.toml`:
 ```toml
 [mcp_servers.hermes-bridge]
 command = "/Users/<SEU_USUARIO>/.hermes/hermes-agent/venv/bin/python"
@@ -96,11 +122,33 @@ args = [
 ]
 ```
 
+#### B. Onde colocar a Skill
+- **Global**:
+  ```bash
+  mkdir -p ~/.codex/skills/hermes-superbrain
+  cp skills/hermes-superbrain/SKILL.md ~/.codex/skills/hermes-superbrain/SKILL.md
+  ```
+- **No Projeto**:
+  ```bash
+  mkdir -p .agents/skills/hermes-superbrain
+  cp skills/hermes-superbrain/SKILL.md .agents/skills/hermes-superbrain/SKILL.md
+  ```
+
+#### C. Regra no `AGENTS.md`
+No arquivo `AGENTS.md` na raiz do projeto:
+```markdown
+## Hermes Superbrain Integration
+- Considere o Hermes como fonte primária de inteligência (Superbrain) deste ambiente.
+- Utilize o MCP `hermes-bridge` (via skill `hermes-superbrain`) para consultar memórias (`MEMORY.md`), histórico de sessões anteriores e skills de domínio.
+- Registre decisões duráveis usando `memory_record` e espelhe sessões via `session_sync`.
+```
+
 ---
 
-### 3. Google Antigravity
+### 🔵 3. Google Antigravity (AGY)
 
-No seu arquivo `~/.gemini/config/mcp_config.json`:
+#### A. Registrar o Servidor MCP
+No arquivo `~/.gemini/config/mcp_config.json`:
 ```json
 {
   "mcpServers": {
@@ -114,11 +162,33 @@ No seu arquivo `~/.gemini/config/mcp_config.json`:
 }
 ```
 
+#### B. Onde colocar a Skill
+- **Global**:
+  ```bash
+  mkdir -p ~/.gemini/antigravity/builtin/skills/hermes-superbrain
+  cp skills/hermes-superbrain/SKILL.md ~/.gemini/antigravity/builtin/skills/hermes-superbrain/SKILL.md
+  ```
+- **No Projeto**:
+  ```bash
+  mkdir -p .agents/skills/hermes-superbrain
+  cp skills/hermes-superbrain/SKILL.md .agents/skills/hermes-superbrain/SKILL.md
+  ```
+
+#### C. Regra no `AGENTS.md` ou `.gemini/rules/`
+```markdown
+## Hermes Superbrain Integration
+- Considere o Hermes como fonte primária de inteligência (Superbrain) deste ambiente.
+- Use ativamente o MCP `hermes-bridge` para consultar memórias (`context_pack` / `memory_search`) antes de executar tarefas.
+- Grave fatos duráveis com `memory_record` e sincronize marcos via `session_sync`.
+```
+
 ---
 
-### 4. Cursor / Windsurf / Claude Desktop / Zed
+### 🟠 4. Cursor / Windsurf
 
-No arquivo de configuração de MCPs (`.cursor/mcp.json` ou `claude_desktop_config.json`):
+#### A. Registrar o Servidor MCP
+No arquivo `.cursor/mcp.json` (no projeto) ou `~/.cursor/mcp.json` (global):
+*(Para o Windsurf: `~/.codeium/windsurf/mcp_config.json`)*
 ```json
 {
   "mcpServers": {
@@ -132,8 +202,29 @@ No arquivo de configuração de MCPs (`.cursor/mcp.json` ou `claude_desktop_conf
 }
 ```
 
-> **Por que usar o Python do venv do Hermes?**  
-> O interpretador em `~/.hermes/hermes-agent/venv/bin/python` já inclui Python 3.11 e os drivers SQLite mais recentes (sem o bug de WAL reset), evitando erros de versões antigas do Python do sistema.
+#### B. Regra no `.cursorrules` ou `.windsurfrules`
+```markdown
+Consulte sempre o MCP hermes-bridge (ferramentas context_pack e memory_search) para obter contexto durável do Hermes antes de implementar mudanças.
+```
+
+---
+
+### ⚡ 5. Zed Editor
+
+No seu `~/.config/zed/settings.json`:
+```json
+{
+  "context_servers": [
+    {
+      "id": "hermes-bridge",
+      "command": {
+        "path": "/Users/<SEU_USUARIO>/.hermes/hermes-agent/venv/bin/python",
+        "args": ["/Users/<SEU_USUARIO>/dev/hermes-bridge/hermes_bridge_mcp.py"]
+      }
+    }
+  ]
+}
+```
 
 ---
 
@@ -154,28 +245,6 @@ O servidor disponibiliza 10 ferramentas universais:
 | **`skill_list`** | Lista todas as skills de domínio com categorias e descrições. | Leitura |
 | **`skill_view`** | Exibe o manual de instruções completo de uma skill específica. | Leitura |
 | **`profile_list`** | Lista os perfis disponíveis no Hermes (`default`, `simpay`, etc.). | Leitura |
-
----
-
-## 📦 Como Ensinar seu Agente a Usar o Hermes
-
-Este repositório inclui uma skill pronta para uso em [`skills/hermes-superbrain/SKILL.md`](skills/hermes-superbrain/SKILL.md).
-
-### 1. Copie a skill para o seu projeto:
-```bash
-# Antigravity / Claude Code / Codex
-mkdir -p .agents/skills/hermes-superbrain
-cp skills/hermes-superbrain/SKILL.md .agents/skills/hermes-superbrain/SKILL.md
-```
-
-### 2. Adicione as instruções ao seu arquivo de regras (`AGENTS.md` ou `CLAUDE.md`):
-```markdown
-## Hermes Superbrain Integration
-- Considere o Hermes como fonte primária de inteligência (Superbrain) deste ambiente.
-- Utilize o MCP `hermes-bridge` (via skill `hermes-superbrain`) para consultar memórias e sessões passadas antes de planejar ou codificar.
-- Quando aprender regras duráveis do projeto, grave na memória via `memory_record`.
-- Sempre que concluir um marco relevante, sincronize a sessão via `session_sync`.
-```
 
 ---
 

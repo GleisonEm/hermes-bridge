@@ -12,8 +12,8 @@ fi
 echo "======================================================="
 echo "   Hermes Bridge MCP — Installer & Diagnostics         "
 echo "======================================================="
-echo "==> Local directory: $HERE"
-echo "==> Python interpreter: $PYTHON_EXEC"
+echo "==> Diretório local: $HERE"
+echo "==> Python utilizado: $PYTHON_EXEC"
 
 # 1. Permissões de execução
 chmod +x "$HERE/hermes_bridge_mcp.py"
@@ -28,7 +28,29 @@ cp -f "$HERE/bin/hermes-superbrain" "$BIN_TARGET/hermes-superbrain"
 chmod +x "$BIN_TARGET/hermes-superbrain"
 echo "==> CLI hermes-superbrain instalada em: $BIN_TARGET/hermes-superbrain"
 
-# 3. Teste rápido de conectividade
+# 3. Instalar Skill nos Harnesses detectados globalmente
+echo "==> Detectando Harnesses de IA para instalação da Skill..."
+SKILL_SRC="$HERE/skills/hermes-superbrain/SKILL.md"
+
+if [ -d "$HOME/.claude" ]; then
+  mkdir -p "$HOME/.claude/skills/hermes-superbrain"
+  cp -f "$SKILL_SRC" "$HOME/.claude/skills/hermes-superbrain/SKILL.md"
+  echo "  ✓ Skill instalada no Anthropic Claude Code: ~/.claude/skills/hermes-superbrain/"
+fi
+
+if [ -d "$HOME/.codex" ]; then
+  mkdir -p "$HOME/.codex/skills/hermes-superbrain"
+  cp -f "$SKILL_SRC" "$HOME/.codex/skills/hermes-superbrain/SKILL.md"
+  echo "  ✓ Skill instalada no OpenAI Codex: ~/.codex/skills/hermes-superbrain/"
+fi
+
+if [ -d "$HOME/.gemini" ]; then
+  mkdir -p "$HOME/.gemini/antigravity/builtin/skills/hermes-superbrain"
+  cp -f "$SKILL_SRC" "$HOME/.gemini/antigravity/builtin/skills/hermes-superbrain/SKILL.md"
+  echo "  ✓ Skill instalada no Google Antigravity: ~/.gemini/antigravity/builtin/skills/hermes-superbrain/"
+fi
+
+# 4. Teste rápido de conectividade com Hermes
 echo "==> Testando comunicação com o Hermes..."
 TEST_OUTPUT=$("$PYTHON_EXEC" -c "
 import sys
@@ -38,12 +60,12 @@ print(hermes_bridge_mcp._tool_profile_list())
 " 2>/dev/null || true)
 
 if [ -n "$TEST_OUTPUT" ]; then
-  echo "✅ Conexão com Hermes bem-sucedida!"
+  echo "✅ Conexão com o banco do Hermes bem-sucedida!"
 else
   echo "⚠️ Aviso: ~/.hermes não encontrado ou sem histórico ainda. O bridge funcionará normalmente assim que o Hermes for iniciado."
 fi
 
-# 4. Configuração automática do Claude Code (se o CLI 'claude' existir)
+# 5. Configuração automática do Claude Code (se o CLI 'claude' existir)
 if command -v claude >/dev/null 2>&1; then
   echo ""
   echo "==> Claude Code detectado no PATH!"
@@ -57,16 +79,15 @@ fi
 
 echo ""
 echo "======================================================="
-echo "               Configurações Prontas                   "
+echo "          Configurações Prontas por Harness            "
 echo "======================================================="
 echo ""
-echo "Copie e cole a configuração abaixo no seu editor/agente:"
-echo ""
-echo "--- [1] Anthropic Claude Code (~/.claude/settings.json ou ~/.claude.json) ---"
+echo "--- [1] Anthropic Claude Code (~/.claude.json ou ~/.claude/settings.json) ---"
 cat << JSON
 {
   "mcpServers": {
     "hermes-bridge": {
+      "type": "stdio",
       "command": "$PYTHON_EXEC",
       "args": [
         "$HERE/hermes_bridge_mcp.py"
@@ -100,7 +121,7 @@ cat << JSON
 JSON
 
 echo ""
-echo "--- [4] Cursor / Zed / Claude Desktop ---"
+echo "--- [4] Cursor (.cursor/mcp.json ou ~/.cursor/mcp.json) ---"
 cat << JSON
 {
   "mcpServers": {
@@ -111,6 +132,22 @@ cat << JSON
       ]
     }
   }
+}
+JSON
+
+echo ""
+echo "--- [5] Zed (~/.config/zed/settings.json) ---"
+cat << JSON
+{
+  "context_servers": [
+    {
+      "id": "hermes-bridge",
+      "command": {
+        "path": "$PYTHON_EXEC",
+        "args": ["$HERE/hermes_bridge_mcp.py"]
+      }
+    }
+  ]
 }
 JSON
 
