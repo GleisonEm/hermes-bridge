@@ -1,47 +1,79 @@
-# Hermes Bridge MCP — Superbrain for Coding Agents
+# 🧠 Hermes Bridge MCP — Superbrain for Coding Agents
 
-Conecte qualquer agente de código (**Google Antigravity**, **Anthropic Claude Code**, **OpenAI Codex**, **Cursor**, **Zed**) ao **Hermes Agent** como um **Superbrain** de memória compartilhada, catálogo de skills e histórico de conversas.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
+[![Hermes Compatible](https://img.shields.io/badge/Hermes-Agent-purple.svg)](https://github.com/NousResearch/hermes-agent)
+
+Conecte qualquer agente de código (**Anthropic Claude Code**, **OpenAI Codex**, **Google Antigravity**, **Cursor**, **Zed**) ao **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** como um **Superbrain** compartilhado de memórias duráveis, catálogo de skills e histórico de sessões.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      CODING AGENTS                          │
-│                                                             │
-│   Claude Code │ OpenAI Codex │ Antigravity │ Cursor │ Zed   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼ (MCP stdio JSON-RPC)
-                      hermes_bridge_mcp.py
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       HERMES AGENT                          │
-│                                                             │
-│  • Memória Persistente (MEMORY.md + USER.md)                │
-│  • 110+ Skills de Domínio (curadas e pontuadas)             │
-│  • Histórico Completo de Mensagens & Tool Calls (state.db)  │
-│  • Espelhamento Bidirecional de Sessões (session_sync)      │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         CODING AGENTS                            │
+│                                                                  │
+│   Claude Code  │  OpenAI Codex  │  Google Antigravity  │ Cursor  │
+└─────────────────────────────────┬────────────────────────────────┘
+                                  │
+                                  ▼ (MCP stdio JSON-RPC)
+                         hermes_bridge_mcp.py
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                          HERMES AGENT                            │
+│                                                                  │
+│  • Memória Persistente (MEMORY.md + USER.md com locks e limites) │
+│  • 110+ Skills de Domínio (curadas, pontuadas e injetadas)       │
+│  • Histórico Completo de Mensagens & Tool Calls (state.db)       │
+│  • Espelhamento Bidirecional de Conversas (session_sync)         │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 > [!TIP]
-> **Zero modificação no Hermes**: O `hermes-bridge` roda como um servidor MCP standalone e seguro. Ele lê o banco SQLite em modo somente-leitura (`?mode=ro`), respeita os locks de memória oficiais do Hermes e não altera nenhum código interno.
+> **Zero modificações no Hermes**: O `hermes-bridge` roda como um servidor MCP autônomo. Ele lê o banco SQLite em modo somente-leitura (`?mode=ro`), grava memórias usando o `MemoryStore` oficial do Hermes e não altera nenhum arquivo interno do core.
 
 ---
 
-## 🚀 Como Configurar em Cada Agente
+## 📋 Pré-requisitos
+
+1. **Hermes Agent instalado**: Você só precisa ter a instalação padrão do Hermes no seu computador (`~/.hermes` com `state.db`).
+2. **Python 3.10+**: O ambiente virtual que já vem no Hermes (`~/.hermes/hermes-agent/venv/bin/python`) possui Python 3.11+ e é o interpretador recomendado.
+
+---
+
+## ⚡ Instalação Rápida (1 Minuto)
+
+Clone o repositório e execute o script instalador:
+
+```bash
+git clone https://github.com/GleisonEm/hermes-bridge.git ~/dev/hermes-bridge
+cd ~/dev/hermes-bridge
+./install.sh
+```
+
+O instalador vai:
+- Validar a conexão com o seu banco do Hermes.
+- Instalar a CLI `hermes-superbrain` no seu PATH (`~/.local/bin/`).
+- Se detectar o Claude Code instalado, perguntará se deseja adicioná-lo automaticamente via CLI.
+- Gerar os blocos de configuração prontos com os **caminhos absolutos exatos** da sua máquina.
+
+---
+
+## 🔧 Configuração Manual por Agente
+
+Caso prefira configurar manualmente no seu editor ou agente favorito, use os blocos abaixo:
 
 ### 1. Anthropic Claude Code
 
-Você pode adicionar diretamente via CLI:
+Você pode adicionar em um único comando no terminal:
 ```bash
-claude mcp add hermes-bridge -- /Users/<SEU_USUARIO>/.hermes/hermes-agent/venv/bin/python /Users/<SEU_USUARIO>/dev/hermes-bridge/hermes_bridge_mcp.py
+claude mcp add hermes-bridge -- ~/.hermes/hermes-agent/venv/bin/python /Users/<SEU_USUARIO>/dev/hermes-bridge/hermes_bridge_mcp.py
 ```
 
-Ou no seu `~/.claude/settings.json`:
+Ou editando diretamente o seu arquivo de configuração global (`~/.claude.json` ou `~/.claude/settings.json`):
 ```json
 {
   "mcpServers": {
     "hermes-bridge": {
+      "type": "stdio",
       "command": "/Users/<SEU_USUARIO>/.hermes/hermes-agent/venv/bin/python",
       "args": [
         "/Users/<SEU_USUARIO>/dev/hermes-bridge/hermes_bridge_mcp.py"
@@ -55,7 +87,7 @@ Ou no seu `~/.claude/settings.json`:
 
 ### 2. OpenAI Codex
 
-No seu `~/.codex/config.toml`:
+No seu arquivo `~/.codex/config.toml`:
 ```toml
 [mcp_servers.hermes-bridge]
 command = "/Users/<SEU_USUARIO>/.hermes/hermes-agent/venv/bin/python"
@@ -68,7 +100,7 @@ args = [
 
 ### 3. Google Antigravity
 
-No seu `~/.gemini/config/mcp_config.json`:
+No seu arquivo `~/.gemini/config/mcp_config.json`:
 ```json
 {
   "mcpServers": {
@@ -84,16 +116,16 @@ No seu `~/.gemini/config/mcp_config.json`:
 
 ---
 
-### 4. Cursor / Zed / Claude Desktop
+### 4. Cursor / Windsurf / Claude Desktop / Zed
 
-No arquivo de configuração do seu cliente (`.cursor/mcp.json` ou `claude_desktop_config.json`):
+No arquivo de configuração de MCPs (`.cursor/mcp.json` ou `claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
     "hermes-bridge": {
       "command": "/Users/<SEU_USUARIO>/.hermes/hermes-agent/venv/bin/python",
       "args": [
-        "/caminho/para/hermes-bridge/hermes_bridge_mcp.py"
+        "/Users/<SEU_USUARIO>/dev/hermes-bridge/hermes_bridge_mcp.py"
       ]
     }
   }
@@ -101,66 +133,91 @@ No arquivo de configuração do seu cliente (`.cursor/mcp.json` ou `claude_deskt
 ```
 
 > **Por que usar o Python do venv do Hermes?**  
-> O Hermes vem com um ambiente virtual próprio (`~/.hermes/hermes-agent/venv/bin/python`) com Python 3.11+ e suporte nativo ao SQLite atualizado, garantindo que tudo rode sem conflito com o Python do sistema operacional.
+> O interpretador em `~/.hermes/hermes-agent/venv/bin/python` já inclui Python 3.11 e os drivers SQLite mais recentes (sem o bug de WAL reset), evitando erros de versões antigas do Python do sistema.
 
 ---
 
-## 🛠️ Ferramentas Disponíveis
+## 🛠️ Ferramentas Expostas pelo MCP
+
+O servidor disponibiliza 10 ferramentas universais:
 
 | Ferramenta | Descrição | Tipo |
 | :--- | :--- | :--- |
-| `context_pack` | Context pack automatizado com `MEMORY.md` + top skills pontuadas para o prompt atual. | Leitura |
-| `memory_search` | Busca termos específicos dentro de `MEMORY.md` e `USER.md`. | Leitura |
-| `memory_record` | Adiciona, substitui (`replace`) ou remove fatos da memória durável com lock e validação. | Escrita |
-| `session_list` | Lista as últimas sessões do Hermes com contagem de mensagens e ferramentas. | Leitura |
-| `session_get` | Recupera mensagens e histórico de uma conversa específica. | Leitura |
-| `session_tool_calls` | Raio-x das ferramentas chamadas (comandos shell, SQL, saídas de API). | Leitura |
-| `session_search` | Busca rápida em SQLite FTS5 em todas as mensagens do Hermes. | Leitura |
-| `session_sync` | Espelha transcripts do Antigravity/Claude para dentro do Hermes Desktop (`state.db`). | Escrita |
-| `skill_list` / `skill_view` | Lista e lê instruções completas de qualquer skill do Hermes. | Leitura |
-| `profile_list` | Lista todos os perfis disponíveis no Hermes (`default`, `simpay`, etc.). | Leitura |
+| **`context_pack`** | Pacote automático com `MEMORY.md` + top skills pontuadas para o prompt/tarefa. | Leitura |
+| **`memory_search`** | Busca por palavras-chave dentro de `MEMORY.md` e `USER.md`. | Leitura |
+| **`memory_record`** | Grava, substitui (`replace`) ou remove fatos duráveis com verificação de lock e cota. | Escrita |
+| **`session_list`** | Lista as sessões recentes com data, modelo, contagem de mensagens e ferramentas. | Leitura |
+| **`session_get`** | Retorna o transcript completo de mensagens de qualquer sessão anterior. | Leitura |
+| **`session_tool_calls`** | Raio-x detalhado de ferramentas usadas (comandos bash, SQL, outputs de API). | Leitura |
+| **`session_search`** | Busca instantânea FTS5 em todas as mensagens já trocadas no Hermes. | Leitura |
+| **`session_sync`** | Espelha o histórico do Antigravity/Claude Code direto para o `state.db` do Hermes. | Escrita |
+| **`skill_list`** | Lista todas as skills de domínio com categorias e descrições. | Leitura |
+| **`skill_view`** | Exibe o manual de instruções completo de uma skill específica. | Leitura |
+| **`profile_list`** | Lista os perfis disponíveis no Hermes (`default`, `simpay`, etc.). | Leitura |
 
 ---
 
-## 📦 Instalando a Skill no seu Agente
+## 📦 Como Ensinar seu Agente a Usar o Hermes
 
-Copie a skill incluída neste repositório para o seu projeto:
+Este repositório inclui uma skill pronta para uso em [`skills/hermes-superbrain/SKILL.md`](skills/hermes-superbrain/SKILL.md).
 
+### 1. Copie a skill para o seu projeto:
 ```bash
-# Para Antigravity / Claude Code / Codex
+# Antigravity / Claude Code / Codex
 mkdir -p .agents/skills/hermes-superbrain
 cp skills/hermes-superbrain/SKILL.md .agents/skills/hermes-superbrain/SKILL.md
 ```
 
-E adicione ao seu arquivo de regras (`AGENTS.md` ou `CLAUDE.md`):
+### 2. Adicione as instruções ao seu arquivo de regras (`AGENTS.md` ou `CLAUDE.md`):
 ```markdown
 ## Hermes Superbrain Integration
 - Considere o Hermes como fonte primária de inteligência (Superbrain) deste ambiente.
-- Utilize o MCP `hermes-bridge` (via skill `hermes-superbrain`) para consultar memórias e sessões passadas antes de tarefas complexas.
+- Utilize o MCP `hermes-bridge` (via skill `hermes-superbrain`) para consultar memórias e sessões passadas antes de planejar ou codificar.
+- Quando aprender regras duráveis do projeto, grave na memória via `memory_record`.
 - Sempre que concluir um marco relevante, sincronize a sessão via `session_sync`.
 ```
 
 ---
 
-## ⚡ CLI Utilitário: `hermes-superbrain`
+## 🖥️ CLI Utilitário: `hermes-superbrain`
 
-O script em `bin/hermes-superbrain` permite consultar e operar tudo pelo terminal:
+O script em `bin/hermes-superbrain` permite consultar o Hermes a qualquer momento diretamente pelo terminal:
 
 ```bash
-# Adicione ao seu PATH
-cp bin/hermes-superbrain ~/.local/bin/hermes-superbrain
+# Exemplos de uso no terminal:
+hermes-superbrain list 5                      # Lista as 5 últimas sessões
+hermes-superbrain mem "configuração postgres" # Busca nas notas de memória
+hermes-superbrain search "timeout 504"        # Busca FTS5 em todas as sessões
+hermes-superbrain pack "ajustar webhook pix" 3# Gera context pack com top 3 skills
+hermes-superbrain remember "Porta dev: 8098"  # Grava novo fato no MEMORY.md
+hermes-superbrain sync <id-conversa> "Título" # Sincroniza sessão ativa
 
-# Exemplos de uso:
-hermes-superbrain list 5                      # Lista últimas 5 sessões
-hermes-superbrain mem "pagamento pix"         # Busca na memória persistente
-hermes-superbrain search "erro 502"           # Busca FTS5 em todas as sessões
-hermes-superbrain pack "ajustar webhook" 3    # Gera context pack com top 3 skills
-hermes-superbrain remember "Porta dev: 8098"  # Grava na memória durável
-hermes-superbrain sync <id-conversa> "Título" # Sincroniza sessão
+# Opcional: especificar perfil com a flag -p
+hermes-superbrain -p simpay list 5
 ```
 
 ---
 
-## Licença
+## 🎯 Suporte Multi-Perfis do Hermes
 
-MIT — veja [LICENSE](LICENSE).
+Se você utiliza múltiplos perfis no Hermes (ex: `simpay`, `work`, `default`), o `hermes-bridge` suporta todos de forma adaptativa:
+
+- **Detecção Automática**: Se você tiver o perfil `simpay`, ele será o padrão. Se estiver na máquina de outra pessoa, ele usa `default` automaticamente.
+- **Sobrescrevendo via argumento**: Todas as ferramentas do MCP aceitam o parâmetro `"profile": "<nome>"`.
+- **Sobrescrevendo via flag**: Na configuração do MCP, adicione `"--profile", "<nome>"`.
+
+---
+
+## 🧪 Teste Rápido de Funcionamento
+
+Após configurar, abra o seu agente (Claude Code, Antigravity ou Codex) e pergunte:
+
+> *"Consulte o hermes-bridge e me diga quais memórias e skills você encontrou sobre este projeto."*
+
+Se ele responder citando suas regras e contexto do Hermes, a ponte está 100% ativa!
+
+---
+
+## 📄 Licença
+
+Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
