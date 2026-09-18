@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""CLI utility to query and mutate Hermes superbrain data easily from terminal or scripts."""
+import json
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+DEFAULT_SCRIPT = Path.home() / ".hermes/scripts/antigravity-acp/hermes_bridge_mcp.py"
+DEV_SCRIPT = Path.home() / "dev/hermes-bridge/hermes_bridge_mcp.py"
+SCRIPT = DEFAULT_SCRIPT if DEFAULT_SCRIPT.is_file() else DEV_SCRIPT
+
+HERMES_PY = Path.home() / ".hermes/hermes-agent/venv/bin/python"
+PY_EXEC = str(HERMES_PY) if HERMES_PY.is_file() else sys.executable
+
+if len(sys.argv) < 2:
+    print("""Usage: hermes-superbrain [-p PROFILE] <command> [args...]
+
+Global Options:
+  -p, --profile <name>                   Target Hermes profile (default: 'simpay')
+
+Commands:
+  profiles                               List all available profiles
+  pack <task_prompt> [max_skills]        Generate complete Hermes Context Pack
+  list [limit] [search]                  List recent sessions
+  get <session_id> [limit] [offset]     Get transcript messages
+  tools <session_id> [tool_name] [limit] Inspect tool calls / results
+  search <query> [limit]                 Full-text search in state.db
+  skills [category]                      List available skills
+  skill <name>                           View full skill instructions
+  mem <query>                            Search memory and user profile
+  remember <fact> [target]               Save durable fact into Hermes MEMORY.md (target: memory/user)
+  sync <conversation_id> [title]         Sync Antigravity conversation transcript into Hermes state.db
+  sync-claude [session_id|latest] [title] Sync a Claude Code session (default: newest of current project)
+  sync-hook                              Claude Code hook mode: reads hook JSON on stdin (Stop/SessionEnd) and syncs it
+""")
+    sys.exit(0)
+
+DEFAULT_PROFILE = "simpay" if (Path.home() / ".hermes/profiles/simpay").is_dir() else "default"
+profile = DEFAULT_PROFILE
+args = sys.argv[1:]
+if args[0] in ("-p", "--profile") and len(args) > 2:
+    profile = args[1]
+    args = args[2:]
+
+cmd = args[0]
+
+def call_tool(name, tool_args):
+    import json
+    tool_args["profile"] = profile
+    p = subprocess.Popen([PY_EXEC, str(SCRIPT), "--profile", profile],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n")
+    p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": name, "arguments": tool_args}}) + "\n")
+    p.stdin.flush()
+    p.stdout.readline()
+    res = json.loads(p.stdout.readline())
+    p.stdin.close()
+    p.terminate()
+    return res.get("result", {}).get("content", [{}])[0].get("text", "")
+
+if cmd == "profiles":
+    print(call_tool("profile_list", {}))
+elif cmd == "pack":
+    task = args[1]
+    max_skills = int(args[2]) if len(args) > 2 and args[2].isdigit() else 3
+    print(call_tool("context_pack", {"task_description": task, "max_skills": max_skills}))
+elif cmd == "list":
+    limit = int(args[1]) if len(args) > 1 and args[1].isdigit() else 15
+    search = args[2] if len(args) > 2 else (args[1] if len(args) > 1 and not args[1].isdigit() else "")
+    print(call_tool("session_list", {"limit": limit, "search": search}))
+elif cmd == "get":
+    sid = args[1]
+    limit = int(args[2]) if len(args) > 2 else 40
+    offset = int(args[3]) if len(args) > 3 else 0
+    print(call_tool("session_get", {"session_id": sid, "limit": limit, "offset": offset}))
+elif cmd == "tools":
+    sid = args[1]
+    tname = args[2] if len(args) > 2 and not args[2].isdigit() else ""
+    limit = int(args[3]) if len(args) > 3 else (int(args[2]) if len(args) > 2 and args[2].isdigit() else 30)
+    print(call_tool("session_tool_calls", {"session_id": sid, "tool_name": tname, "limit": limit}))
+elif cmd == "search":
+    query = " ".join(args[1:])
+    print(call_tool("session_search", {"query": query, "limit": 15}))
+elif cmd == "skills":
+    cat = args[1] if len(args) > 1 else ""
+    print(call_tool("skill_list", {"category_filter": cat}))
+elif cmd == "skill":
+    name = args[1]
+    print(call_tool("skill_view", {"name": name}))
+elif cmd == "mem":
+    query = " ".join(args[1:])
+    print(call_tool("memory_search", {"query": query}))
+elif cmd == "remember":
+    fact = args[1]
+    target = args[2] if len(args) > 2 else "memory"
+    print(call_tool("memory_record", {"content": fact, "target": target, "action": "add"}))
+elif cmd == "sync":
+    cid = args[1]
+    title = args[2] if len(args) > 2 else "Antigravity Session"
+    print(call_tool("session_sync", {"conversation_id": cid, "title": title}))
+elif cmd == "sync-claude":
+    cid = args[1] if len(args) > 1 else ""
+    targs = {"conversation_id": cid, "source": "claude", "cwd_dir": os.getcwd()}
+    if len(args) > 2:
+        targs["title"] = args[2]
+    print(call_tool("session_sync", targs))
+elif cmd == "sync-hook":
+    try:
+        hook = json.load(sys.stdin)
+    except Exception:
+        hook = {}
+    targs = {
+        "conversation_id": hook.get("session_id", ""),
+        "source": "claude",
+        "cwd_dir": hook.get("cwd") or os.getcwd(),
+    }
+    if hook.get("transcript_path"):
+        targs["transcript_path"] = hook["transcript_path"]
+    print(call_tool("session_sync", targs))
+else:
+    print(f"Unknown command {cmd}")
